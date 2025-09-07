@@ -1,18 +1,19 @@
 [
   {
-    "email": "professor@hs-aalen.de",
+    "email": "professor@university.de",
     "password": "73y47t3794",
     "role": "professor"
   },
   {
-    "email": "student@studmail.htw-aalen.de",
+    "email": "student@university.de",
     "password": "123477884",
     "role": "student"
   },
   {
-    "email": "anotherprof@hs-aalen.de",
+    "email": "anotherprof@university.de",
     "password": "123635354",
     "role": "professor"
   }
 
 ]
+
