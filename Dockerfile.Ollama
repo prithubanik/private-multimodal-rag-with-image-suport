@@ -1,0 +1,27 @@
+# Use the official Ollama base image
+FROM ollama/ollama:latest
+
+# --- Healthcheck ---
+# This healthcheck ensures the container is ready to accept requests
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:11434/api/tags || exit 1
+
+# --- Model Pre-loading ---
+# By pulling the models during the build process, they will be included in the image,
+# which significantly speeds up the startup time of your application.
+# The server is started in the background, models are pulled, and then the server is stopped.
+RUN \
+    ollama serve & \
+    sleep 5 && \
+    echo "Pulling required LLMs... This may take a while." && \
+    ollama pull nomic-embed-text && \
+    ollama pull gemma3:27b && \
+    echo "Model pulling complete." && \
+    pkill ollama
+
+# --- Expose Port ---
+# Expose the default Ollama port
+EXPOSE 11434
+
+# The base image already has an entrypoint that runs "ollama serve",
+# so we don't need to specify it again.

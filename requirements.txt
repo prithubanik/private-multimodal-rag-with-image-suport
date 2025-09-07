@@ -1,0 +1,49 @@
+# Python Dependencies for IMFAA Chatbot
+
+# Streamlit for the web UI
+streamlit
+
+# LangChain Core and Integrations
+langchain
+langchain-core
+langchain-community
+langchain-huggingface # Keep this if you plan to use HuggingFace text models
+langchain-ollama
+
+# Embeddings (used by langchain-huggingface for the model)
+# Explicitly listed for clarity and robustness, as they are key underlying dependencies.
+sentence-transformers
+torch # Core dependency for many ML libraries, including sentence-transformers
+
+# Vector Store
+faiss-cpu # Specific CPU version of FAISS
+
+# For BM25Retriever
+rank_bm25 # Added for BM25Retriever
+
+# LLM Server Client / API Interaction
+requests
+
+# Document Processing and OCR
+PyPDF2 # For PDF text extraction (can keep for general PDF, but PyMuPDF is for images)
+Pillow # Core image processing library for pytesseract
+pytesseract # Python wrapper for Tesseract OCR
+python-docx # For Word document processing
+pypdf
+# --- NEW: For Image Extraction and Vision Models ---
+PyMuPDF # For robust PDF image extraction (used by `fitz` in document_processor)
+transformers # REQUIRED if using real vision models like CLIP (e.g., from Hugging Face)
+docx2txt
+
+# Natural Language Processing / Utilities
+langdetect # For language detection
+psutil # For system utilities like memory usage
+
+# Data Validation / Pydantic Models
+pydantic
+
+
+torch
+sentencepiece
+
+

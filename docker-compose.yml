@@ -1,0 +1,104 @@
+version: '3.8'
+services:
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama # Use the new Dockerfile for Ollama
+    container_name: ollama
+    ports:
+      - "8900:11434" # Changed host port for Ollama to 8900
+    volumes:
+      - ollama_data:/root/.ollama
+      # Volume for temporary user-uploaded chat images (accessed by Ollama for direct image input)
+      - chat_uploaded_images:/tmp/uploaded_chat_images:rw
+      # Volume for persistently storing extracted images from documents (accessed by Ollama for image embeddings)
+      - extracted_kb_images:/app/faiss_index/extracted_images:rw
+    entrypoint: # Simplified entrypoint as curl is now installed via Dockerfile.ollama
+      - /bin/bash
+      - -c
+      - |
+        set -e # Exit immediately if a command exits with a non-zero status.
+
+        # Start Ollama server in the background
+        ollama serve &
+
+        echo "Starting Ollama server and pre-loading models..."
+        # Give Ollama a few seconds to start its server process before pulling models
+        sleep 5 
+
+        # Pull and warm up generative model (gemma3:27b)
+        echo "Pulling and warming up gemma3:27b..."
+        ollama pull gemma3:27b || true # Use || true to prevent script exit if already pulled
+        ollama run gemma3:27b "Hi" || true # Warm up the model, || true prevents exit on minor errors
+
+        # Pull embedding model (nomic-embed-text) - no 'run' command needed for embedding models
+        echo "Pulling nomic-embed-text..."
+        ollama pull nomic-embed-text || true
+
+        echo "All required Ollama models are ready. Keeping container alive."
+        wait # Keep the container running
+    healthcheck:
+      # This healthcheck uses curl, which will now be available due to Dockerfile.ollama
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s # Increased interval for more leniency during checks
+      timeout: 20s  # Increased timeout for the curl command
+      retries: 5
+      start_period: 600s # Increased start_period to give more time for model downloads and warm-up
+      start_interval: 10s # NEW: Check every 10 seconds during the start_period
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_DEBUG=1
+      - MODEL=gemma3:27b
+      - TEXT_EMBEDDING_MODEL=nomic-embed-text
+      - MULTIMODAL_OLLAMA_MODEL=gemma3:27b
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile # Refers to your application's Dockerfile
+    ports:
+      - "8901:8501" # Changed host port for Streamlit app to 8901
+    volumes:
+      # Mount the users.json file
+      - ./users.json:/app/users.json
+      # Separate document folders for professor and shared content
+      - ./documents/professor_docs:/app/documents/professor_docs
+      - ./documents/shared_docs:/app/documents/shared_docs
+      # FAISS index folders for professor and student
+      - ./faiss_index/professor:/app/faiss_index/professor
+      - ./faiss_index/student:/app/faiss_index/student
+      # Volume for temporary user-uploaded chat images (accessed by Streamlit app)
+      - chat_uploaded_images:/tmp/uploaded_chat_images:rw
+      # Volume for persistently storing extracted images from documents (accessed by Streamlit app for display)
+      - extracted_kb_images:/app/faiss_index/extracted_images:rw
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MODEL=gemma3:27b # Standardized to gemma3:27b
+      - TEXT_EMBEDDING_MODEL=nomic-embed-text # Ensure this is explicitly set for document_processor
+      - MULTIMODAL_OLLAMA_MODEL=gemma3:27b # Added for document_processor to use
+      - UI_LANG=en
+      # Environment variables mapping to the paths used in chatbot.py and document_processor.py
+      - PROF_DOCS_PATH=/app/documents/professor_docs
+      - SHARED_DOCS_PATH=/app/documents/shared_docs
+      - PROF_VECTORSTORE_PATH=/app/faiss_index/professor
+      - STUDENT_VECTORSTORE_PATH=/app/faiss_index/student
+      - PERSISTENT_EXTRACTED_IMAGES_DIR=/app/faiss_index/extracted_images # Corrected env var for persistent images
+      - USERS_FILE=/app/users.json # Pass the path to the users file
+    depends_on:
+      ollama:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+
+volumes:
+  ollama_data:
+  chat_uploaded_images:
+  extracted_kb_images:
